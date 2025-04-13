@@ -1,7 +1,8 @@
-import argparse
 import random
 import sys
 from collections import deque
+
+import click
 
 
 def generate_maze(width: int, height: int, seed: int | None = None):
@@ -219,25 +220,14 @@ def solve_maze(maze_list: list[str]):
     return None
 
 
-# --- Main execution block ---
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate an ASCII maze with entrance and exit."
-    )
-    parser.add_argument("width", type=int, help="Width of the maze (number of cells).")
-    parser.add_argument(
-        "height", type=int, help="Height of the maze (number of cells)."
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="Random seed for reproducible maze generation.",
-        default=None,
-    )
-    args = parser.parse_args()
-
-    print(f"\nGenerating a {args.width}x{args.height} maze...\n")
-    generated_maze = generate_maze(args.width, args.height, args.seed)
+@click.command(name="generate-example")
+@click.argument("width", type=int)
+@click.argument("height", type=int)
+@click.option("--seed", type=int, help="Random seed for reproducible maze generation")
+def generate_maze_command(width, height, seed):
+    """Generate an ASCII maze with entrance and exit."""
+    print(f"\nGenerating a {width}x{height} maze...\n")
+    generated_maze = generate_maze(width, height, seed)
 
     if not generated_maze:
         sys.exit("No such maze")
@@ -252,3 +242,8 @@ if __name__ == "__main__":
             print("Could not solve maze.")
         else:
             print("\n".join(solution))
+
+
+# For backwards compatibility with direct script execution
+if __name__ == "__main__":
+    generate_maze_command()

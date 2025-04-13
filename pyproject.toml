@@ -5,10 +5,12 @@ description = "A benchmark for testing LLM performance at solving ascii mazes."
 readme = "README.md"
 authors = [{ name = "Jeremiah England", email = "englandtuning@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "click>=8.1.7",
+]
 
 [project.scripts]
-ascii-maze-benchmark = "ascii_maze_benchmark:main"
+ascii-maze-benchmark = "ascii_maze_benchmark:cli"
 
 [build-system]
 requires = ["hatchling"]
