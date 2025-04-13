@@ -1,0 +1,15 @@
+[project]
+name = "ascii-maze-benchmark"
+version = "0.1.0"
+description = "A benchmark for testing LLM performance at solving ascii mazes."
+readme = "README.md"
+authors = [{ name = "Jeremiah England", email = "englandtuning@gmail.com" }]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+ascii-maze-benchmark = "ascii_maze_benchmark:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
