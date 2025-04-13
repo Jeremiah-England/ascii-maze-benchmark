@@ -15,14 +15,21 @@ from ascii_maze_benchmark.generate_maze_script import generate_maze, solve_maze
 class BenchmarkRunner:
     """Class to handle running the ASCII maze benchmark against various models."""
 
-    def __init__(self, model_id: str, cache_dir: str = ".cache/benchmark_results"):
+    def __init__(
+        self,
+        model_id: str,
+        cache_dir: str = ".cache/benchmark_results",
+        verbose: bool = False,
+    ):
         """
         Initialize the benchmark runner.
 
         Args:
             model_id: The OpenRouter model ID to test
             cache_dir: Directory to cache results
+            verbose: Whether to print detailed information during benchmarking
         """
+        self.verbose = verbose
         # Load environment variables from .env file
         load_dotenv()
 
@@ -156,6 +163,11 @@ Here's the maze:
 Provide only the maze with the solution path marked with '.' characters:
 """
 
+                if self.verbose:
+                    click.echo("\n=== Input Maze ===")
+                    click.echo(maze_str)
+                    click.echo("==================\n")
+
                 # Call the API to get the model's solution
                 response = self._call_openrouter_api(prompt)
                 model_solution = self._extract_solution(response)
@@ -163,6 +175,16 @@ Provide only the maze with the solution path marked with '.' characters:
                 # Evaluate the solution
                 exact_match = self._is_exact_match(solution, model_solution)
                 levenshteins = self._calculate_levenshteins(solution, model_solution)
+
+                # Print comparison if verbose
+                if self.verbose and model_solution:
+                    click.echo("\n=== Correct Solution vs Model Solution ===")
+                    click.echo(f"Exact match: {'✓' if exact_match else '✗'}")
+                    click.echo("\nCorrect solution:")
+                    click.echo("\n".join(solution))
+                    click.echo("\nModel solution:")
+                    click.echo("\n".join(model_solution))
+                    click.echo("=========================================\n")
 
                 # Store result
                 result = {
@@ -210,6 +232,11 @@ Provide only the maze with the solution path marked with '.' characters:
         try:
             # Extract the content from the assistant's message
             content = response["choices"][0]["message"]["content"]
+
+            if self.verbose:
+                click.echo("\n=== Model Response ===")
+                click.echo(content)
+                click.echo("=====================\n")
 
             # Try to extract just the maze part using common patterns
             lines = content.strip().split("\n")
@@ -316,8 +343,18 @@ Provide only the maze with the solution path marked with '.' characters:
     default=".cache/benchmark_results",
     help="Directory to cache benchmark results",
 )
+@click.option(
+    "--verbose",
+    is_flag=True,
+    help="Print the input maze and model's response for each test",
+)
 def benchmark_command(
-    model_id: str, maze_sizes: str, mazes_per_size: int, seed: int, cache_dir: str
+    model_id: str,
+    maze_sizes: str,
+    mazes_per_size: int,
+    seed: int,
+    cache_dir: str,
+    verbose: bool = False,
 ):
     """Run ASCII maze benchmark on the specified model."""
     # Parse maze sizes from string (format: "3x3,4x4,5x5")
@@ -335,9 +372,11 @@ def benchmark_command(
     click.echo(f"Running benchmark on model: {model_id}")
     click.echo(f"Testing maze sizes: {maze_sizes}")
     click.echo(f"Mazes per size: {mazes_per_size}")
+    if verbose:
+        click.echo("Verbose mode: ON")
 
     try:
-        runner = BenchmarkRunner(model_id, cache_dir)
+        runner = BenchmarkRunner(model_id, cache_dir, verbose)
         results = runner.run_benchmark(sizes, mazes_per_size, seed)
 
         # Analyze and print summary
