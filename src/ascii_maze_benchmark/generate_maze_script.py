@@ -4,19 +4,23 @@ import sys
 from collections import deque
 
 
-def generate_maze(width: int, height: int):
+def generate_maze(width: int, height: int, seed: int | None = None):
     """
     Generates an ASCII maze of specified width and height with an entrance and exit.
 
     Args:
         width (int): The number of cells wide the maze should be.
         height (int): The number of cells high the maze should be.
+        seed (int, optional): Random seed for reproducible maze generation. Defaults to None.
 
     Returns
     -------
         list: A list of strings representing the ASCII maze.
               Returns None if width or height is less than 1.
     """
+    # Set random seed if provided
+    if seed is not None:
+        random.seed(seed)
     if width < 1 or height < 1:
         print("Error: Maze width and height must be at least 1.")
         return None
@@ -37,7 +41,10 @@ def generate_maze(width: int, height: int):
     # --- Maze Generation Algorithm (Recursive Backtracker / DFS) ---
 
     # 1. Choose a random starting cell (doesn't have to be the entrance)
-    start_cell_row, start_cell_col = random.randint(0, height - 1), random.randint(0, width - 1)
+    start_cell_row, start_cell_col = (
+        random.randint(0, height - 1),
+        random.randint(0, width - 1),
+    )
     visited[start_cell_row][start_cell_col] = True
     stack.append((start_cell_row, start_cell_col))
 
@@ -49,7 +56,7 @@ def generate_maze(width: int, height: int):
         current_cell_row, current_cell_col = stack[-1]
 
         neighbors = []
-        for dr, dc in [(-1, 0), (1, 0), (0, 1), (0, -1)]: # N, S, E, W
+        for dr, dc in [(-1, 0), (1, 0), (0, 1), (0, -1)]:  # N, S, E, W
             next_cell_row, next_cell_col = current_cell_row + dr, current_cell_col + dc
 
             if 0 <= next_cell_row < height and 0 <= next_cell_col < width:
@@ -70,7 +77,7 @@ def generate_maze(width: int, height: int):
             visited[next_cell_row][next_cell_col] = True
             stack.append((next_cell_row, next_cell_col))
         else:
-            stack.pop() # Backtrack
+            stack.pop()  # Backtrack
 
     # --- Create Entrance and Exit ---
     # Break the outer wall at specific points.
@@ -95,8 +102,7 @@ def generate_maze(width: int, height: int):
     # adjacent to an inner ' ' path space.
 
     # Convert the grid (list of lists) into a list of strings
-    maze_str_list = ["".join(row) for row in maze]
-    return maze_str_list
+    return ["".join(row) for row in maze]
 
 
 def print_maze(maze_list: list[str]):
@@ -107,7 +113,6 @@ def print_maze(maze_list: list[str]):
         print(row)
     print(" " * (len(maze_list[0]) - 2) + "^")
     print(" " * (len(maze_list[0]) - 6) + "FINISH")
-
 
 
 def solve_maze(maze_list: list[str]):
@@ -126,7 +131,7 @@ def solve_maze(maze_list: list[str]):
     """
     height = len(maze_list)
     width = len(maze_list[0])
-    maze = [list(row) for row in maze_list] # Convert to list of lists for mutability
+    maze = [list(row) for row in maze_list]  # Convert to list of lists for mutability
 
     start = None
     end = None
@@ -135,27 +140,37 @@ def solve_maze(maze_list: list[str]):
     # Check top/bottom borders
     for c in range(width):
         if maze[0][c] == " ":
-            if start is None: start = (0, c)
-            else: end = (0, c)
+            if start is None:
+                start = (0, c)
+            else:
+                end = (0, c)
         if maze[height - 1][c] == " ":
-            if start is None: start = (height - 1, c)
-            else: end = (height - 1, c)
+            if start is None:
+                start = (height - 1, c)
+            else:
+                end = (height - 1, c)
     # Check left/right borders (avoid double-checking corners)
     for r in range(1, height - 1):
         if maze[r][0] == " ":
-            if start is None: start = (r, 0)
-            else: end = (r, 0)
+            if start is None:
+                start = (r, 0)
+            else:
+                end = (r, 0)
         if maze[r][width - 1] == " ":
-            if start is None: start = (r, width - 1)
-            else: end = (r, width - 1)
+            if start is None:
+                start = (r, width - 1)
+            else:
+                end = (r, width - 1)
 
     if start is None or end is None:
-        print("Error: Could not find exactly two openings (start and end) on the border.")
+        print(
+            "Error: Could not find exactly two openings (start and end) on the border."
+        )
         # Return the original maze maybe? Or indicate error.
-        return ["".join(row) for row in maze] # Return original if no start/end
+        return ["".join(row) for row in maze]  # Return original if no start/end
 
     # 2. BFS Implementation
-    queue = deque([(start, [start])]) # Store (current_position, path_so_far)
+    queue = deque([(start, [start])])  # Store (current_position, path_so_far)
     visited = {start}
 
     solution_path = None
@@ -176,20 +191,24 @@ def solve_maze(maze_list: list[str]):
             # 1. Within bounds
             # 2. Not a wall
             # 3. Not visited yet
-            if 0 <= nr < height and 0 <= nc < width and \
-               maze[nr][nc] != "#" and (nr, nc) not in visited:
+            if (
+                0 <= nr < height
+                and 0 <= nc < width
+                and maze[nr][nc] != "#"
+                and (nr, nc) not in visited
+            ):
                 visited.add((nr, nc))
-                new_path = path + [(nr, nc)] # Create the new path
+                new_path = path + [(nr, nc)]  # Create the new path
                 queue.append(((nr, nc), new_path))
 
     # 3. Mark the solution path on the maze
     if solution_path:
-        solved_maze_list = [row[:] for row in maze] # Create a copy to modify
+        solved_maze_list = [row[:] for row in maze]  # Create a copy to modify
         for r, c in solution_path:
             # Avoid overwriting start/end if they are walls technically
             # (though they should be spaces found earlier)
             if solved_maze_list[r][c] == " ":
-                 solved_maze_list[r][c] = "." # Mark path with '.'
+                solved_maze_list[r][c] = "."  # Mark path with '.'
         # Optional: Mark Start and End differently
         # sr, sc = start
         # er, ec = end
@@ -199,15 +218,26 @@ def solve_maze(maze_list: list[str]):
 
     return None
 
+
 # --- Main execution block ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate an ASCII maze with entrance and exit.")
+    parser = argparse.ArgumentParser(
+        description="Generate an ASCII maze with entrance and exit."
+    )
     parser.add_argument("width", type=int, help="Width of the maze (number of cells).")
-    parser.add_argument("height", type=int, help="Height of the maze (number of cells).")
+    parser.add_argument(
+        "height", type=int, help="Height of the maze (number of cells)."
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducible maze generation.",
+        default=None,
+    )
     args = parser.parse_args()
 
     print(f"\nGenerating a {args.width}x{args.height} maze...\n")
-    generated_maze = generate_maze(args.width, args.height)
+    generated_maze = generate_maze(args.width, args.height, args.seed)
 
     if not generated_maze:
         sys.exit("No such maze")
@@ -215,7 +245,6 @@ if __name__ == "__main__":
     print_maze(generated_maze)
 
     if generated_maze:
-
         print("\nSolving maze...\n")
 
         solution = solve_maze(generated_maze)
