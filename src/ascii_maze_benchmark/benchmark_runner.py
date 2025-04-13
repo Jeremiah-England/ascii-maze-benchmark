@@ -117,6 +117,38 @@ In the solution, mark the path using periods ('.') for each step of the path.
 Do not include the START and FINISH labels or arrows in your solution.
 Only output the maze with the solution path marked.
 
+For example, if given this:
+
+START
+ v
+# #########
+#   #     #
+# # # ### #
+# #     # #
+# ##### # #
+# #   # # #
+# ### ### #
+#   #   # #
+### ### # #
+#     #   #
+######### #
+         ^
+     FINISH
+
+Output this:
+
+#.#########
+#...#.....#
+# #.#.###.#
+# #...  #.#
+# ##### #.#
+# #   # #.#
+# ### ###.#
+#   #   #.#
+### ### #.#
+#     #  .#
+#########.#
+
 Here's the maze:
 
 {maze_str}
