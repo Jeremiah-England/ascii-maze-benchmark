@@ -252,3 +252,70 @@ def test_print_maze(capsys):
     expected_output = "START\n v\n###\n# #\n###\n ^\nFINISH\n"
 
     assert captured.out == expected_output
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_solution"),
+    [
+        # Test case 1: Solution in ```solution block
+        (
+            "I'll think about this maze step by step.\n\n```solution\n#.#########\n#...#.....#\n###.#.###.#\n# #.#.#...#\n# #.#.#.###\n```",
+            [
+                "#.#########",
+                "#...#.....#",
+                "###.#.###.#",
+                "# #.#.#...#",
+                "# #.#.#.###",
+            ],
+        ),
+        # Test case 2: Solution in regular code block (should be ignored)
+        (
+            "Here's my solution:\n\n```\n#.#########\n#...#.....#\n###.#.###.#\n```",
+            [],
+        ),
+        # Test case 3: Solution with no code blocks, just raw lines (should also be ignored)
+        (
+            "My solution is:\n\n#.#########\n#...#.....#\n###.#.###.#",
+            [],
+        ),
+        # Test case 4: Multiple code blocks but only extract solution block
+        (
+            "First attempt:\n```\n#.####.####\n#...#...#.#\n###.#.###.#\n```\n\nBetter solution:\n```solution\n#.#########\n#...#.....#\n###.#.###.#\n```",
+            [
+                "#.#########",
+                "#...#.....#",
+                "###.#.###.#",
+            ],
+        ),
+        # Test case 5: Empty response
+        (
+            "",
+            [],
+        ),
+        # Test case 6: No valid maze lines
+        (
+            "I'm not sure how to solve this maze.",
+            [],
+        ),
+        # Test case 7: Multiple solution blocks - use the last one
+        (
+            "First solution attempt:\n```solution\n#.####.####\n#...#...#.#\n###.#.###.#\n```\n\nImproved solution:\n```solution\n#.#########\n#...#.....#\n###.#.###.#\n```",
+            [
+                "#.#########",
+                "#...#.....#",
+                "###.#.###.#",
+            ],
+        ),
+        # Test case 8: Multiple regular code blocks - should be ignored completely
+        (
+            "First attempt:\n```\n#.####.####\n#...#...#.#\n###.#.###.#\n```\n\nSecond attempt:\n```\n#.#########\n#...#.....#\n###.#.###.#\n```",
+            [],  # No solution blocks, so no output
+        ),
+    ],
+)
+def test_extract_solution_from_content(content, expected_solution):
+    """Test the solution extraction logic with various response formats."""
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+
+    solution = BenchmarkRunner.extract_solution_from_content(content)
+    assert solution == expected_solution

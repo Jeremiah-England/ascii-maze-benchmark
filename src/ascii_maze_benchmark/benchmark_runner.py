@@ -122,7 +122,9 @@ Your task is to find a valid path through the maze from start to finish.
 
 In the solution, mark the path using periods ('.') for each step of the path.
 Do not include the START and FINISH labels or arrows in your solution.
-Only output the maze with the solution path marked.
+
+You can think about your approach and summarize your reasoning as much as you wish.
+However, your final solution must be enclosed within a ```solution{{}}``` code block.
 
 For example, if given this:
 
@@ -142,8 +144,9 @@ START
          ^
      FINISH
 
-Output this:
+Your output should be:
 
+```solution
 #.#########
 #...#.....#
 # #.#.###.#
@@ -155,12 +158,11 @@ Output this:
 ### ### #.#
 #     #  .#
 #########.#
+```
 
 Here's the maze:
 
 {maze_str}
-
-Provide only the maze with the solution path marked with '.' characters:
 """
 
                 if self.verbose:
@@ -227,6 +229,51 @@ Provide only the maze with the solution path marked with '.' characters:
 
         return response.json()
 
+    @staticmethod
+    def extract_solution_from_content(content: str) -> List[str]:
+        """
+        Extract maze solution from model response content.
+
+        Args:
+            content: The text content from the model response
+
+        Returns:
+            List of strings representing the maze solution
+        """
+        # Look for ```solution code blocks - find the LAST one if multiple exist
+        solution_blocks = []
+        current_block = []
+        in_solution_block = False
+        lines = content.strip().split("\n")
+
+        for line in lines:
+            line_stripped = line.strip()
+            # Check for ```solution block start
+            if line_stripped.startswith("```solution"):
+                in_solution_block = True
+                current_block = []
+                continue
+            # Check for block end if we're in a solution block
+            elif in_solution_block and line_stripped.startswith("```"):
+                in_solution_block = False
+                # Only keep blocks that have maze-like content
+                if any("#" in line or "." in line for line in current_block):
+                    solution_blocks.append(current_block)
+                continue
+            # Collect lines within solution block
+            elif in_solution_block and line_stripped and ("#" in line or "." in line):
+                current_block.append(line_stripped)
+
+        # If we found any solution blocks, return the last one
+        if solution_blocks:
+            return solution_blocks[-1]
+
+        # If no solution blocks found, we ignore all regular code blocks
+        # Skip directly to raw text parsing
+
+        # We should only return solution blocks, so return empty list if none found
+        return []
+
     def _extract_solution(self, response: Dict[str, Any]) -> List[str]:
         """Extract the solution from the API response."""
         try:
@@ -238,24 +285,7 @@ Provide only the maze with the solution path marked with '.' characters:
                 click.echo(content)
                 click.echo("=====================\n")
 
-            # Try to extract just the maze part using common patterns
-            lines = content.strip().split("\n")
-
-            # Filter out markdown code blocks if present
-            if "```" in content:
-                in_code_block = False
-                maze_lines = []
-                for line in lines:
-                    if line.strip().startswith("```"):
-                        in_code_block = not in_code_block
-                        continue
-                    if in_code_block and line.strip() and ("#" in line or "." in line):
-                        maze_lines.append(line)
-                return maze_lines
-
-            # Otherwise, look for lines containing maze characters
-            maze_lines = [line for line in lines if ("#" in line or "." in line)]
-            return maze_lines
+            return self.extract_solution_from_content(content)
 
         except (KeyError, IndexError):
             return []
