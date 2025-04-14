@@ -1,6 +1,6 @@
 import os
-import json
 import random
+import hashlib
 from pathlib import Path
 from typing import List, Dict, Any
 import time
@@ -8,6 +8,7 @@ import time
 import click
 import requests
 from dotenv import load_dotenv
+from diskcache import Cache
 
 from ascii_maze_benchmark.generate_maze_script import generate_maze, solve_maze
 
@@ -18,7 +19,7 @@ class BenchmarkRunner:
     def __init__(
         self,
         model_id: str,
-        cache_dir: str = ".cache/benchmark_results",
+        cache_dir: str = ".cache/api_responses",
         verbose: bool = False,
     ):
         """
@@ -26,7 +27,7 @@ class BenchmarkRunner:
 
         Args:
             model_id: The OpenRouter model ID to test
-            cache_dir: Directory to cache results
+            cache_dir: Directory to cache API responses
             verbose: Whether to print detailed information during benchmarking
         """
         self.verbose = verbose
@@ -43,11 +44,11 @@ class BenchmarkRunner:
         self.model_id = model_id
 
         # Create cache directory if it doesn't exist
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_dir_path = Path(cache_dir)
+        cache_dir_path.mkdir(parents=True, exist_ok=True)
 
-        # Cache path for this specific model
-        self.cache_path = self.cache_dir / f"{model_id.replace('/', '_')}.json"
+        # Cache for LLM API responses
+        self.api_cache = Cache(directory=str(cache_dir_path))
 
     def run_benchmark(
         self, maze_sizes: List[tuple], num_mazes_per_size: int = 3, seed: int = 42
@@ -63,12 +64,6 @@ class BenchmarkRunner:
         Returns:
             Dictionary containing benchmark results
         """
-        # Check for cached results
-        if self.cache_path.exists():
-            with open(self.cache_path, "r") as f:
-                print(f"Loading cached results for {self.model_id}")
-                return json.load(f)
-
         # Set random seed for reproducibility
         random.seed(seed)
 
@@ -89,20 +84,30 @@ class BenchmarkRunner:
         for width, height in maze_sizes:
             for maze_seed in maze_seeds:
                 current_maze += 1
+                # Use bright blue for the maze number and cyan for dimensions
                 click.echo(
-                    f"Testing maze {current_maze}/{total_mazes}: {width}x{height} (seed: {maze_seed})"
+                    f"Testing maze {click.style(f'{current_maze}/{total_mazes}', fg='bright_blue')}: {click.style(f'{width}x{height}', fg='cyan')} (seed: {click.style(str(maze_seed), fg='cyan')})"
                 )
 
                 # Generate maze
                 maze = generate_maze(width, height, maze_seed)
                 if not maze:
-                    click.echo(f"Failed to generate maze of size {width}x{height}")
+                    click.echo(
+                        click.style(
+                            f"Failed to generate maze of size {width}x{height}",
+                            fg="red",
+                        )
+                    )
                     continue
 
                 # Solve maze to get the correct solution
                 solution = solve_maze(maze)
                 if not solution:
-                    click.echo(f"Failed to solve maze of size {width}x{height}")
+                    click.echo(
+                        click.style(
+                            f"Failed to solve maze of size {width}x{height}", fg="red"
+                        )
+                    )
                     continue
 
                 # Convert maze to string for prompt
@@ -167,7 +172,7 @@ Here's the maze:
 
                 if self.verbose:
                     click.echo("\n=== Input Maze ===")
-                    click.echo(maze_str)
+                    click.echo(click.style(maze_str, fg="cyan", bold=True))
                     click.echo("==================\n")
 
                 # Call the API to get the model's solution
@@ -181,11 +186,13 @@ Here's the maze:
                 # Print comparison if verbose
                 if self.verbose and model_solution:
                     click.echo("\n=== Correct Solution vs Model Solution ===")
-                    click.echo(f"Exact match: {'✓' if exact_match else '✗'}")
+                    click.echo(
+                        f"Exact match: {click.style('✓', fg='green', bold=True) if exact_match else click.style('✗', fg='red', bold=True)}"
+                    )
                     click.echo("\nCorrect solution:")
-                    click.echo("\n".join(solution))
+                    click.echo(click.style("\n".join(solution), fg="green"))
                     click.echo("\nModel solution:")
-                    click.echo("\n".join(model_solution))
+                    click.echo(click.style("\n".join(model_solution), fg="yellow"))
                     click.echo("=========================================\n")
 
                 # Store result
@@ -200,14 +207,30 @@ Here's the maze:
 
                 results["results"].append(result)
 
-                # Save results after each maze to enable partial resume if needed
-                with open(self.cache_path, "w") as f:
-                    json.dump(results, f, indent=2)
-
         return results
 
     def _call_openrouter_api(self, prompt: str) -> Dict[str, Any]:
-        """Call the OpenRouter API with the provided prompt."""
+        """
+        Call the OpenRouter API with the provided prompt.
+
+        Uses a cache to avoid redundant API calls for the same prompt and model.
+        """
+        # Create a cache key based on the model and prompt
+        # We use SHA-256 to handle very long prompts that might exceed key length limits
+        key = f"{self.model_id}:{hashlib.sha256(prompt.encode()).hexdigest()}"
+
+        # Check if we have a cached response
+        cached_response = self.api_cache.get(key)
+        if cached_response is not None:
+            if self.verbose:
+                click.echo(
+                    click.style(
+                        "Using cached LLM API response", fg="bright_black", italic=True
+                    )
+                )
+            return cached_response
+
+        # If not in cache, make the API call
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -218,6 +241,13 @@ Here's the maze:
             "messages": [{"role": "user", "content": prompt}],
         }
 
+        if self.verbose:
+            click.echo(
+                click.style(
+                    "Calling OpenRouter API (not cached)", fg="bright_blue", italic=True
+                )
+            )
+
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data
         )
@@ -227,7 +257,11 @@ Here's the maze:
                 f"API call failed with status code {response.status_code}: {response.text}"
             )
 
-        return response.json()
+        # Cache the response
+        result = response.json()
+        self.api_cache.set(key, result)
+
+        return result
 
     @staticmethod
     def extract_solution_from_content(content: str) -> List[str]:
@@ -282,7 +316,7 @@ Here's the maze:
 
             if self.verbose:
                 click.echo("\n=== Model Response ===")
-                click.echo(content)
+                click.echo(click.style(content, fg="bright_black"))
                 click.echo("=====================\n")
 
             return self.extract_solution_from_content(content)
@@ -370,8 +404,8 @@ Here's the maze:
 @click.option(
     "--cache-dir",
     type=str,
-    default=".cache/benchmark_results",
-    help="Directory to cache benchmark results",
+    default=".cache/api_responses",
+    help="Directory to cache API responses",
 )
 @click.option(
     "--verbose",
@@ -395,15 +429,19 @@ def benchmark_command(
             sizes.append((width, height))
     except ValueError:
         click.echo(
-            "Error: Invalid maze sizes format. Use format: WIDTHxHEIGHT,WIDTHxHEIGHT"
+            click.style(
+                "Error: Invalid maze sizes format. Use format: WIDTHxHEIGHT,WIDTHxHEIGHT",
+                fg="red",
+                bold=True,
+            )
         )
         return
 
-    click.echo(f"Running benchmark on model: {model_id}")
-    click.echo(f"Testing maze sizes: {maze_sizes}")
-    click.echo(f"Mazes per size: {mazes_per_size}")
+    click.echo(f"Running benchmark on model: {click.style(model_id, fg='bright_blue')}")
+    click.echo(f"Testing maze sizes: {click.style(maze_sizes, fg='cyan')}")
+    click.echo(f"Mazes per size: {click.style(str(mazes_per_size), fg='cyan')}")
     if verbose:
-        click.echo("Verbose mode: ON")
+        click.echo(f"Verbose mode: {click.style('ON', fg='green', bold=True)}")
 
     try:
         runner = BenchmarkRunner(model_id, cache_dir, verbose)
@@ -413,10 +451,12 @@ def benchmark_command(
         exact_matches = sum(1 for r in results["results"] if r["exact_match"])
         total = len(results["results"])
 
-        click.echo("\nBenchmark Results Summary:")
-        click.echo(f"Model: {model_id}")
+        click.echo("\n" + click.style("Benchmark Results Summary:", bold=True))
+        click.echo(f"Model: {click.style(model_id, fg='bright_blue', bold=True)}")
+        percentage = exact_matches / total * 100
+        color = "green" if percentage >= 75 else "yellow" if percentage >= 50 else "red"
         click.echo(
-            f"Exact matches: {exact_matches}/{total} ({exact_matches / total * 100:.2f}%)"
+            f"Exact matches: {click.style(f'{exact_matches}/{total} ({percentage:.2f}%)', fg=color, bold=True)}"
         )
 
         # Compute average scores for different Levenshtein thresholds
@@ -434,14 +474,26 @@ def benchmark_command(
 
         for threshold in thresholds:
             matches = sum(1 for r in results["results"] if r["levenshteins"][threshold])
-            click.echo(f"{threshold}: {matches}/{total} ({matches / total * 100:.2f}%)")
+            match_percentage = matches / total * 100
+            threshold_color = (
+                "green"
+                if match_percentage >= 75
+                else "yellow"
+                if match_percentage >= 50
+                else "red"
+            )
+            # Format the threshold name nicely
+            threshold_display = (
+                threshold.replace("_", " ").replace("percent", "within").title()
+            )
+            click.echo(
+                f"{threshold_display}: {click.style(f'{matches}/{total} ({match_percentage:.2f}%)', fg=threshold_color)}"
+            )
 
-        # Cache path for this model
-        cache_path = Path(cache_dir) / f"{model_id.replace('/', '_')}.json"
-        click.echo(f"\nDetailed results saved to: {cache_path}")
+        # No results file is saved - just a summary to the console
 
     except Exception as e:
-        click.echo(f"Error running benchmark: {e}")
+        click.echo(click.style(f"Error running benchmark: {e}", fg="red", bold=True))
 
 
 if __name__ == "__main__":
