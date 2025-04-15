@@ -186,14 +186,29 @@ Here's the maze:
                 # Print comparison if verbose
                 if self.verbose and model_solution:
                     click.echo("\n=== Correct Solution vs Model Solution ===")
+                    # Calculate Levenshtein distance for display
+                    distance = self._levenshtein_distance(
+                        "\n".join(solution), "\n".join(model_solution)
+                    )
                     click.echo(
-                        f"Exact match: {click.style('✓', fg='green', bold=True) if exact_match else click.style('✗', fg='red', bold=True)}"
+                        f"Exact match: {click.style('✓', fg='green', bold=True) if exact_match else click.style('✗', fg='red', bold=True)} (Levenshtein distance: {click.style(str(distance), fg='cyan', bold=True)})"
                     )
                     click.echo("\nCorrect solution:")
                     click.echo(click.style("\n".join(solution), fg="green"))
                     click.echo("\nModel solution:")
                     click.echo(click.style("\n".join(model_solution), fg="yellow"))
                     click.echo("=========================================\n")
+
+                # Calculate Levenshtein distance for result
+                distance = self._levenshtein_distance(
+                    "\n".join(solution), "\n".join(model_solution)
+                )
+
+                # Display Levenshtein distance
+                match_text = "✓" if exact_match else "✗"
+                click.echo(
+                    f"Solution: {click.style(match_text, fg='green' if exact_match else 'red', bold=True)} (Levenshtein distance: {click.style(str(distance), fg='cyan', bold=True)})"
+                )
 
                 # Store result
                 result = {
@@ -203,6 +218,7 @@ Here's the maze:
                     "model_solution": model_solution,
                     "exact_match": exact_match,
                     "levenshteins": levenshteins,
+                    "levenshtein_distance": distance,
                 }
 
                 results["results"].append(result)
@@ -455,8 +471,13 @@ def benchmark_command(
         click.echo(f"Model: {click.style(model_id, fg='bright_blue', bold=True)}")
         percentage = exact_matches / total * 100
         color = "green" if percentage >= 75 else "yellow" if percentage >= 50 else "red"
+
+        # Calculate average Levenshtein distance
+        avg_distance = (
+            sum(r["levenshtein_distance"] for r in results["results"]) / total
+        )
         click.echo(
-            f"Exact matches: {click.style(f'{exact_matches}/{total} ({percentage:.2f}%)', fg=color, bold=True)}"
+            f"Exact matches: {click.style(f'{exact_matches}/{total} ({percentage:.2f}%)', fg=color, bold=True)} (Avg Levenshtein distance: {click.style(f'{avg_distance:.2f}', fg='cyan', bold=True)})"
         )
 
         # Compute average scores for different Levenshtein thresholds
