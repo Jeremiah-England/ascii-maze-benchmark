@@ -23,8 +23,7 @@ def generate_maze(width: int, height: int, seed: int | None = None):
     if seed is not None:
         random.seed(seed)
     if width < 1 or height < 1:
-        print("Error: Maze width and height must be at least 1.")
-        return None
+        raise ValueError("Error: Maze width and height must be at least 1.")
 
     # Maze grid dimensions (including walls)
     grid_width = 2 * width + 1
@@ -216,8 +215,8 @@ def solve_maze(maze_list: list[str]):
         # solved_maze_list[sr][sc] = 'S'
         # solved_maze_list[er][ec] = 'E'
         return ["".join(row) for row in solved_maze_list]
-
-    return None
+    else:
+        raise ValueError("No solution")
 
 
 @click.command(name="generate-example")

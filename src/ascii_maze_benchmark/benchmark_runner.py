@@ -244,6 +244,7 @@ Here's the maze:
                         "Using cached LLM API response", fg="bright_black", italic=True
                     )
                 )
+            assert isinstance(cached_response, dict)
             return cached_response
 
         # If not in cache, make the API call
