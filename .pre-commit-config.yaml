@@ -17,5 +17,3 @@ repos:
     rev: v1.1.399
     hooks:
       - id: pyright
-        files: ^((plugins/((infra)|(ai)|(other)))|(libraries)|(timers)|(infrastructure))/.*\.py$
-        exclude: ^libraries/vs-database/.*\.py$
