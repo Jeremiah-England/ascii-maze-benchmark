@@ -1,6 +1,10 @@
 import pytest
 
-from ascii_maze_benchmark.generate_maze_script import generate_maze, solve_maze
+from ascii_maze_benchmark.generate_maze_script import (
+    generate_maze,
+    solve_maze,
+    solution_to_directions,
+)
 
 
 @pytest.mark.parametrize(
@@ -198,10 +202,8 @@ def test_invalid_maze_parameters(invalid_input):
     width, height = invalid_input
 
     # Generate maze with invalid parameters
-    maze = generate_maze(width, height, 42)  # Use consistent seed
-
-    # Check that the result is None for invalid inputs
-    assert maze is None
+    with pytest.raises(ValueError):
+        generate_maze(width, height, 42)  # Use consistent seed
 
 
 def test_generation_deterministic():
@@ -319,3 +321,458 @@ def test_extract_solution_from_content(content, expected_solution):
 
     solution = BenchmarkRunner.extract_solution_from_content(content)
     assert solution == expected_solution
+
+
+@pytest.mark.parametrize(
+    ("solution_path", "expected_directions"),
+    [
+        # Simple straight path: down and right
+        ([(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)], ["down", "down", "right", "right"]),
+        # U-shaped path: down, right, up
+        (
+            [(0, 0), (1, 0), (2, 0), (2, 1), (1, 1), (0, 1)],
+            ["down", "down", "right", "up", "up"],
+        ),
+        # All four directions: down, right, up, left
+        ([(0, 0), (1, 0), (1, 1), (0, 1), (0, 2)], ["down", "right", "up", "right"]),
+        # Spiral pattern
+        (
+            [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2), (1, 2), (0, 2), (0, 1)],
+            ["down", "down", "right", "right", "up", "up", "left"],
+        ),
+        # Empty path
+        ([], []),
+        # Single point (no direction)
+        ([(0, 0)], []),
+    ],
+)
+def test_solution_to_directions(solution_path, expected_directions):
+    """Test converting a path to directions."""
+    directions = solution_to_directions(solution_path)
+    assert directions == expected_directions
+
+
+def test_maze_to_directions():
+    """Test solving a maze and converting the solution to directions."""
+    # Generate a 3x3 maze with a specific seed
+    maze = generate_maze(3, 3, 42)
+
+    # Solve the maze and get the raw path
+    _, raw_path = solve_maze(maze, return_raw_path=True)
+
+    # Convert the path to directions
+    directions = solution_to_directions(raw_path)
+
+    # For this specific maze and seed, we know the expected directions
+    expected_directions = [
+        "down",
+        "right",
+        "right",
+        "right",
+        "right",
+        "down",
+        "down",
+        "down",
+        "down",
+        "down",
+    ]
+
+    # Check that directions match expected output
+    assert directions == expected_directions
+
+
+@pytest.mark.parametrize(
+    ("content", "expected_directions"),
+    [
+        # Test case 1: Comma-separated directions in a solution block
+        (
+            "I'll solve this maze by following these steps.\n\n```solution\ndown,right,right,down,left,down\n```",
+            ["down", "right", "right", "down", "left", "down"],
+        ),
+        # Test case 2: Newline-separated directions in a solution block
+        (
+            "Here are my steps:\n\n```solution\ndown\nright\nright\ndown\n```",
+            ["down", "right", "right", "down"],
+        ),
+        # Test case 3: Single-line solution without commas or newlines
+        (
+            "My solution:\n\n```solution\ndown right right down\n```",
+            ["down", "right", "right", "down"],
+        ),
+        # Test case 4: Mixed format with spacing variations
+        ("```solution\n  down right down  \n```", ["down", "right", "down"]),
+        # Test case 5: Solution with extra text
+        (
+            "```solution\nHere's my path: down right down\n```",
+            ["down", "right", "down"],
+        ),
+        # Test case 6: Multiple solution blocks - use the last one
+        (
+            "First attempt:\n```solution\ndown right up\n```\nBetter solution:\n```solution\ndown right down\n```",
+            ["down", "right", "down"],
+        ),
+        # Test case 7: Solution outside of solution block as fallback
+        ("I'll go down, then right, then down.", ["down", "right", "down"]),
+        # Test case 8: Empty response
+        ("", []),
+    ],
+)
+def test_extract_directions_from_content(content, expected_directions):
+    """Test extracting directional instructions from model responses."""
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+
+    directions = BenchmarkRunner.extract_directions_from_content(content)
+    assert directions == expected_directions
+
+
+def test_benchmark_runner_directional_mode():
+    """Test BenchmarkRunner's directional mode configuration."""
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+    import os
+    import unittest.mock
+
+    # Mock environment variable for the API key
+    with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
+        # Create a BenchmarkRunner instance in directional mode
+        runner = BenchmarkRunner(
+            model_id="test_model",
+            cache_dir=".test_cache",
+            verbose=True,
+            directional_mode=True,
+        )
+
+        # Verify it's in directional mode
+        assert runner.directional_mode is True
+
+        # Create another runner not in directional mode
+        regular_runner = BenchmarkRunner(
+            model_id="test_model",
+            cache_dir=".test_cache",
+            verbose=True,
+            directional_mode=False,
+        )
+
+        # Verify it's not in directional mode
+        assert regular_runner.directional_mode is False
+
+
+@pytest.mark.parametrize(
+    ("correct_solution", "model_solution", "is_directional_mode", "expected_match"),
+    [
+        # Exact match cases
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right", "down"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right", "down"],
+            False,
+            True,
+        ),
+        # Case with first 'down' omitted - should match in directional mode only
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right", "down"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right", "down"],
+            False,
+            False,
+        ),
+        # Case with last 'down' omitted - should match in directional mode only
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right"],
+            False,
+            False,
+        ),
+        # Case with both first and last 'down' omitted - should match in directional mode only
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right"],
+            False,
+            False,
+        ),
+        # Cases with extra 'down's at the end - should match in directional mode only
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down"],
+            False,
+            False,
+        ),
+        # Case with two extra 'down's at the end - should match in directional mode only
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down", "down"],
+            True,
+            True,
+        ),
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down", "down"],
+            False,
+            False,
+        ),
+        # Case with first 'down' omitted and extra 'down' at the end
+        (
+            ["down", "right", "down", "right"],
+            ["right", "down", "right", "down"],
+            True,
+            True,
+        ),
+        # Case with first 'down' omitted and two extra 'down's at the end
+        (
+            ["down", "right", "down", "right"],
+            ["right", "down", "right", "down", "down"],
+            True,
+            True,
+        ),
+        # Wrong solution cases - should never match
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "left", "down", "right", "down"],
+            True,
+            False,
+        ),
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "up", "right", "down"],
+            False,
+            False,
+        ),
+        # Empty solution cases
+        ([], [], True, True),
+        ([], [], False, True),
+        (
+            ["down"],
+            [],
+            True,
+            True,
+        ),  # Changed to True - a single 'down' should match empty in directional mode
+        ([], ["down"], True, False),
+        # Completely different length solutions
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right"],
+            True,
+            False,
+        ),
+        # Only one 'down' direction in the correct solution
+        (["down"], [], True, True),
+        (["down"], [], False, False),
+        # Extra 'down's beyond the limit - should not match
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down", "down", "down"],
+            True,
+            False,
+        ),
+    ],
+)
+def test_is_exact_match_with_down_omission(
+    correct_solution, model_solution, is_directional_mode, expected_match
+):
+    """
+    Test the _is_exact_match method with various cases of 'down' direction handling.
+
+    The modified _is_exact_match method should account for cases where:
+    1. The leading 'down' direction is omitted
+    2. Up to two extra 'down' directions are added at the end
+    3. Both of the above occur simultaneously
+    """
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+    import os
+    import unittest.mock
+
+    # Mock environment variable for the API key
+    with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
+        # Create a BenchmarkRunner instance with the specified directional mode
+        runner = BenchmarkRunner(
+            model_id="test_model",
+            cache_dir=".test_cache",
+            directional_mode=is_directional_mode,
+        )
+
+        # Test the matching logic
+        assert (
+            runner._is_exact_match(correct_solution, model_solution) == expected_match
+        )
+
+
+@pytest.mark.parametrize(
+    ("directions", "model_solution", "expected_match", "expected_description"),
+    [
+        # Exact match
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right", "down"],
+            True,
+            "Exact match",
+        ),
+        # First 'down' omitted
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right", "down"],
+            True,
+            "Match (first 'down' omitted)",
+        ),
+        # Last 'down' omitted
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "right", "down", "right"],
+            True,
+            "Match (last 'down' omitted)",
+        ),
+        # Both first and last 'down' omitted
+        (
+            ["down", "right", "down", "right", "down"],
+            ["right", "down", "right"],
+            True,
+            "Match (first and last 'down' omitted)",
+        ),
+        # Extra down at the end
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down"],
+            True,
+            "Match (model provided extra 'down')",
+        ),
+        # Two extra downs at the end
+        (
+            ["down", "right", "down", "right"],
+            ["down", "right", "down", "right", "down", "down"],
+            True,
+            "Match (model provided two extra 'downs')",
+        ),
+        # No match case
+        (
+            ["down", "right", "down", "right", "down"],
+            ["down", "left", "down", "right", "down"],
+            False,
+            "Exact match",  # Default description even for non-matches
+        ),
+        # Empty solutions
+        ([], [], True, "Exact match"),
+    ],
+)
+def test_match_description_logic(
+    directions, model_solution, expected_match, expected_description
+):
+    """
+    Test the match description logic used in verbose output.
+
+    The function checks that the correct description is generated based on
+    the type of match:
+    - Exact match
+    - First 'down' omitted
+    - Last 'down' omitted
+    - Both first and last 'down' omitted
+    - Extra 'down' at the end
+    - Two extra 'downs' at the end
+    - Combination of first 'down' omitted and extra 'down's at the end
+    """
+    # This is a direct test of the logic in the verbose output section of the benchmark runner
+
+    # First verify that the match is as expected using our runner
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+    import os
+    import unittest.mock
+
+    # Mock environment variable for the API key
+    with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
+        runner = BenchmarkRunner(
+            model_id="test_model",
+            cache_dir=".test_cache",
+            directional_mode=True,  # Always in directional mode for this test
+        )
+
+        # Verify the match result
+        is_match = runner._is_exact_match(directions, model_solution)
+        assert is_match == expected_match
+
+        # Now test the description logic
+        match_description = "Exact match"
+        if is_match and directions != model_solution and directions:
+            if directions[0] == "down" and model_solution == directions[1:]:
+                match_description = "Match (first 'down' omitted)"
+            elif directions[-1] == "down" and model_solution == directions[:-1]:
+                match_description = "Match (last 'down' omitted)"
+            elif (
+                len(model_solution) >= 1
+                and model_solution[-1] == "down"
+                and directions == model_solution[:-1]
+            ):
+                match_description = "Match (model provided extra 'down')"
+            elif (
+                len(model_solution) >= 2
+                and model_solution[-1] == "down"
+                and model_solution[-2] == "down"
+                and directions == model_solution[:-2]
+            ):
+                match_description = "Match (model provided two extra 'downs')"
+            elif (
+                len(directions) >= 2
+                and directions[0] == "down"
+                and directions[-1] == "down"
+                and model_solution == directions[1:-1]
+            ):
+                match_description = "Match (first and last 'down' omitted)"
+
+        # Check that the description matches expected
+        assert match_description == expected_description
+
+
+def test_combined_first_down_omitted_and_extra_down():
+    """
+    Test the special case where both the first down is omitted and an extra down is added at the end.
+
+    This test ensures that the _is_exact_match method correctly handles this combined scenario.
+    """
+    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
+    import os
+    import unittest.mock
+
+    # Test data
+    correct_solution = ["down", "right", "down", "right"]
+    model_solution = ["right", "down", "right", "down", "down"]
+
+    # Mock environment variable for the API key
+    with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
+        runner = BenchmarkRunner(
+            model_id="test_model",
+            cache_dir=".test_cache",
+            directional_mode=True,
+        )
+
+        # Verify the match result - this should be true because we handle both cases
+        is_match = runner._is_exact_match(correct_solution, model_solution)
+        assert is_match is True
+
+        # Order of checks determines which description would be returned
+        # In our implementation, we check for first 'down' omitted before extra downs
+        # So in verbose output, this would be reported as "first down omitted"
+        # Even though technically both conditions are satisfied

@@ -1,6 +1,7 @@
 import random
 import sys
 from collections import deque
+from typing import List, Tuple
 
 import click
 
@@ -115,19 +116,22 @@ def print_maze(maze_list: list[str]):
     print(" " * (len(maze_list[0]) - 6) + "FINISH")
 
 
-def solve_maze(maze_list: list[str]):
+def solve_maze(maze_list: list[str], return_raw_path: bool = False):
     """
     Solves an ASCII maze represented by a list of strings.
 
     Args:
         maze_list (list): A list of strings representing the maze.
                           '#' = wall, ' ' = path.
+        return_raw_path (bool): If True, returns a tuple of (solution, raw_path)
+                                where raw_path is the list of coordinates.
 
     Returns
     -------
-        list: A list of strings representing the maze with the solution path
-              marked by '.', or None if no solution is found or maze is invalid.
-              Returns the original list if start/end not found.
+        list or tuple: If return_raw_path is False, returns a list of strings
+                      representing the maze with the solution path marked by '.'.
+                      If return_raw_path is True, returns a tuple of (solution, raw_path).
+                      Returns the original list or (original, None) if start/end not found.
     """
     height = len(maze_list)
     width = len(maze_list[0])
@@ -167,7 +171,12 @@ def solve_maze(maze_list: list[str]):
             "Error: Could not find exactly two openings (start and end) on the border."
         )
         # Return the original maze maybe? Or indicate error.
-        return ["".join(row) for row in maze]  # Return original if no start/end
+        if return_raw_path:
+            return [
+                "".join(row) for row in maze
+            ], None  # Return original if no start/end
+        else:
+            return ["".join(row) for row in maze]  # Return original if no start/end
 
     # 2. BFS Implementation
     queue = deque([(start, [start])])  # Store (current_position, path_so_far)
@@ -214,16 +223,28 @@ def solve_maze(maze_list: list[str]):
         # er, ec = end
         # solved_maze_list[sr][sc] = 'S'
         # solved_maze_list[er][ec] = 'E'
-        return ["".join(row) for row in solved_maze_list]
+
+        if return_raw_path:
+            return ["".join(row) for row in solved_maze_list], solution_path
+        else:
+            return ["".join(row) for row in solved_maze_list]
     else:
-        raise ValueError("No solution")
+        if return_raw_path:
+            return None, None
+        else:
+            raise ValueError("No solution")
 
 
 @click.command(name="generate-example")
 @click.argument("width", type=int)
 @click.argument("height", type=int)
 @click.option("--seed", type=int, help="Random seed for reproducible maze generation")
-def generate_maze_command(width, height, seed):
+@click.option(
+    "--directional-mode",
+    is_flag=True,
+    help="Output directional instructions instead of marking the maze",
+)
+def generate_maze_command(width, height, seed, directional_mode):
     """Generate an ASCII maze with entrance and exit."""
     print(f"\nGenerating a {width}x{height} maze...\n")
     generated_maze = generate_maze(width, height, seed)
@@ -236,11 +257,113 @@ def generate_maze_command(width, height, seed):
     if generated_maze:
         print("\nSolving maze...\n")
 
-        solution = solve_maze(generated_maze)
+        if directional_mode:
+            solution, raw_path = solve_maze(generated_maze, return_raw_path=True)
+            if solution is None:
+                print("Could not solve maze.")
+            else:
+                print("\n".join(solution))
+                directions = solution_to_directions(raw_path)
+                print("\nDirectional solution:")
+                print(",".join(directions))
+                print(f"\nPath length: {len(raw_path)} cells, {len(directions)} moves")
+        else:
+            solution = solve_maze(generated_maze)
+            if solution is None:
+                print("Could not solve maze.")
+            else:
+                print("\n".join(solution))
+                # Count the number of dots in the solution to determine path length
+                dot_count = sum(row.count(".") for row in solution)
+                print(f"\nPath length: {dot_count} cells")
+
+
+def solution_to_directions(solution_path: List[Tuple[int, int]]) -> List[str]:
+    """
+    Convert a solution path (list of coordinates) to directional instructions.
+
+    Args:
+        solution_path: List of (row, col) coordinates representing the path
+
+    Returns:
+        List of direction strings ("up", "down", "left", "right")
+    """
+    if not solution_path or len(solution_path) < 2:
+        return []
+
+    directions = []
+    for i in range(1, len(solution_path)):
+        curr_r, curr_c = solution_path[i - 1]
+        next_r, next_c = solution_path[i]
+
+        if next_r < curr_r:
+            directions.append("up")
+        elif next_r > curr_r:
+            directions.append("down")
+        elif next_c < curr_c:
+            directions.append("left")
+        elif next_c > curr_c:
+            directions.append("right")
+
+    return directions
+
+
+@click.command(name="solve-example")
+@click.option(
+    "--directional-mode",
+    is_flag=True,
+    help="Output directional instructions instead of marking the maze",
+)
+def solve_maze_command(directional_mode):
+    """Solve an ASCII maze from standard input."""
+    print("Reading maze from standard input...")
+
+    # Read maze from stdin
+    maze_lines = []
+    for line in sys.stdin:
+        maze_lines.append(line.rstrip("\n"))
+
+    # Remove any header/footer lines (like "START" and "FINISH")
+    # Find the actual maze boundaries (lines with '#')
+    start_idx = 0
+    end_idx = len(maze_lines)
+
+    for i, line in enumerate(maze_lines):
+        if "#" in line:
+            start_idx = i
+            break
+
+    for i in range(len(maze_lines) - 1, -1, -1):
+        if "#" in maze_lines[i]:
+            end_idx = i + 1
+            break
+
+    maze = maze_lines[start_idx:end_idx]
+
+    if not maze:
+        sys.exit("No valid maze found in input")
+
+    print("\nSolving maze...\n")
+
+    if directional_mode:
+        solution, raw_path = solve_maze(maze, return_raw_path=True)
         if solution is None:
             print("Could not solve maze.")
         else:
             print("\n".join(solution))
+            directions = solution_to_directions(raw_path)
+            print("\nDirectional solution:")
+            print(",".join(directions))
+            print(f"\nPath length: {len(raw_path)} cells, {len(directions)} moves")
+    else:
+        solution = solve_maze(maze)
+        if solution is None:
+            print("Could not solve maze.")
+        else:
+            print("\n".join(solution))
+            # Count the number of dots in the solution to determine path length
+            dot_count = sum(row.count(".") for row in solution)
+            print(f"\nPath length: {dot_count} cells")
 
 
 # For backwards compatibility with direct script execution
