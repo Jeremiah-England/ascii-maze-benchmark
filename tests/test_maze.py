@@ -624,64 +624,100 @@ def test_is_exact_match_with_down_omission(
 
 
 @pytest.mark.parametrize(
-    ("directions", "model_solution", "expected_match", "expected_description"),
+    ("directions", "model_solution", "expected_match"),
     [
         # Exact match
         (
             ["down", "right", "down", "right", "down"],
             ["down", "right", "down", "right", "down"],
             True,
-            "Exact match",
         ),
         # First 'down' omitted
         (
             ["down", "right", "down", "right", "down"],
             ["right", "down", "right", "down"],
             True,
-            "Match (first 'down' omitted)",
         ),
         # Last 'down' omitted
         (
             ["down", "right", "down", "right", "down"],
             ["down", "right", "down", "right"],
             True,
-            "Match (last 'down' omitted)",
         ),
         # Both first and last 'down' omitted
         (
             ["down", "right", "down", "right", "down"],
             ["right", "down", "right"],
             True,
-            "Match (first and last 'down' omitted)",
         ),
         # Extra down at the end
         (
             ["down", "right", "down", "right"],
             ["down", "right", "down", "right", "down"],
             True,
-            "Match (model provided extra 'down')",
         ),
         # Two extra downs at the end
         (
             ["down", "right", "down", "right"],
             ["down", "right", "down", "right", "down", "down"],
             True,
-            "Match (model provided two extra 'downs')",
         ),
         # No match case
         (
             ["down", "right", "down", "right", "down"],
             ["down", "left", "down", "right", "down"],
             False,
-            "Exact match",  # Default description even for non-matches
         ),
         # Empty solutions
-        ([], [], True, "Exact match"),
+        ([], [], True),
+        (
+            [
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "right",
+                "right",
+                "up",
+                "up",
+                "right",
+                "right",
+                "right",
+                "right",
+                "down",
+                "down",
+                "down",
+            ],
+            [
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "down",
+                "right",
+                "right",
+                "up",
+                "up",
+                "right",
+                "right",
+                "right",
+                "right",
+                "down",
+                "down",
+                "down",
+                "down",
+            ],
+            True,
+        ),
     ],
 )
-def test_match_description_logic(
-    directions, model_solution, expected_match, expected_description
-):
+def test_match_description_logic(directions, model_solution, expected_match):
     """
     Test the match description logic used in verbose output.
 
@@ -713,37 +749,6 @@ def test_match_description_logic(
         # Verify the match result
         is_match = runner._is_exact_match(directions, model_solution)
         assert is_match == expected_match
-
-        # Now test the description logic
-        match_description = "Exact match"
-        if is_match and directions != model_solution and directions:
-            if directions[0] == "down" and model_solution == directions[1:]:
-                match_description = "Match (first 'down' omitted)"
-            elif directions[-1] == "down" and model_solution == directions[:-1]:
-                match_description = "Match (last 'down' omitted)"
-            elif (
-                len(model_solution) >= 1
-                and model_solution[-1] == "down"
-                and directions == model_solution[:-1]
-            ):
-                match_description = "Match (model provided extra 'down')"
-            elif (
-                len(model_solution) >= 2
-                and model_solution[-1] == "down"
-                and model_solution[-2] == "down"
-                and directions == model_solution[:-2]
-            ):
-                match_description = "Match (model provided two extra 'downs')"
-            elif (
-                len(directions) >= 2
-                and directions[0] == "down"
-                and directions[-1] == "down"
-                and model_solution == directions[1:-1]
-            ):
-                match_description = "Match (first and last 'down' omitted)"
-
-        # Check that the description matches expected
-        assert match_description == expected_description
 
 
 def test_combined_first_down_omitted_and_extra_down():

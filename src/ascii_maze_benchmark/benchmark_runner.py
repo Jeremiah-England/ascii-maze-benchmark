@@ -306,6 +306,15 @@ Here's the maze:
                                 match_description = (
                                     "Match (model provided two extra 'downs')"
                                 )
+                            elif (
+                                len(model_solution) >= 2
+                                and model_solution[0] == "down"
+                                and model_solution[-1] == "down"
+                                and model_solution[1:-1] == directions
+                            ):
+                                match_description = (
+                                    "Match (model provided two extra 'downs')"
+                                )
 
                         click.echo(
                             f"{match_description}: {click.style('✓', fg='green', bold=True) if exact_match else click.style('✗', fg='red', bold=True)}"
@@ -635,6 +644,15 @@ Here's the maze:
                 and model_solution[-1] == "down"
                 and model_solution[-2] == "down"
                 and correct_solution[1:] == model_solution[:-2]
+            ):
+                return True
+
+            # Check if model provided an extra "down" at both the front and end
+            if (
+                len(model_solution) >= 2
+                and model_solution[0] == "down"
+                and model_solution[-1] == "down"
+                and model_solution[1:-1] == correct_solution
             ):
                 return True
 
