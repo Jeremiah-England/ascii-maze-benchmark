@@ -845,6 +845,29 @@ def benchmark_command(
                 click.echo(
                     f"{threshold_display}: {click.style(f'{matches}/{total} ({match_percentage:.2f}%)', fg=threshold_color)}"
                 )
+        # Summarize results by each maze size
+        click.echo()
+        click.echo(click.style("Per-Size Summary:", bold=True))
+        for width, height in sizes:
+            size_results = [
+                r for r in results["results"] if r["maze_size"] == (width, height)
+            ]
+            count = len(size_results)
+            if count == 0:
+                continue
+            matches = sum(r["exact_match"] for r in size_results)
+            pct = matches / count * 100
+            size_color = "green" if pct >= 75 else "yellow" if pct >= 50 else "red"
+            if directional_mode:
+                click.echo(
+                    f"{width}x{height}: {click.style(f'{matches}/{count} ({pct:.2f}%)', fg=size_color)}"
+                )
+            else:
+                avg_dist = sum(r["levenshtein_distance"] for r in size_results) / count
+                click.echo(
+                    f"{width}x{height}: {click.style(f'{matches}/{count} ({pct:.2f}%)', fg=size_color)} "
+                    f"(Avg Levenshtein distance: {click.style(f'{avg_dist:.2f}', fg='cyan')})"
+                )
 
         # No results file is saved - just a summary to the console
 
