@@ -759,6 +759,11 @@ Here's the maze:
     is_flag=True,
     help="Test model's ability to output directional instructions instead of marking the maze",
 )
+@click.option(
+    "--parallel",
+    is_flag=True,
+    help="Run benchmarks for multiple models in parallel (one thread per model)",
+)
 def benchmark_command(
     model_ids: tuple[str, ...],
     maze_sizes: str,
@@ -767,6 +772,7 @@ def benchmark_command(
     cache_dir: str,
     verbose: bool = False,
     directional_mode: bool = False,
+    parallel: bool = False,
 ):
     """Run ASCII maze benchmark on the specified model."""
     # Parse maze sizes from string (format: "3x3,4x4,5x5")
@@ -927,9 +933,14 @@ def benchmark_command(
 
     # ------- Execute benchmarks for each requested model -------
 
-    all_summaries: list[dict[str, Any]] = []
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    for curr_model_id in model_ids:
+    # Helper that runs benchmark for a single model and returns per‑size stats.
+    def _run_model(curr_model_id: str) -> dict[tuple[int, int], tuple[int, int]]:
+        """Wrapper to execute benchmark for one model; meant for ThreadPoolExecutor."""
+
+        # Ensure each model prints its header at the start of the run so the user
+        # gets immediate feedback even when running in parallel.
         _print_run_header(curr_model_id)
 
         try:
@@ -945,12 +956,45 @@ def benchmark_command(
                     bold=True,
                 )
             )
-            continue
+            # Return empty stats so downstream logic does not fail.
+            return {}
 
-        per_size_stats = _print_model_summary(curr_model_id, run_results)
-        all_summaries.append(
-            {"model_id": curr_model_id, "size_summary": per_size_stats}
-        )
+        # Print model summary (thread‑safe in CPython as stdout write is
+        # protected by a lock; some interleaving is possible but acceptable).
+        return _print_model_summary(curr_model_id, run_results)
+
+    all_summaries: list[dict[str, Any]] = []
+
+    if parallel and len(model_ids) > 1:
+        # Run each model benchmark in its own worker thread.
+        max_workers = min(len(model_ids), os.cpu_count() or 1)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_model = {
+                executor.submit(_run_model, mid): mid for mid in model_ids
+            }
+
+            for future in as_completed(future_to_model):
+                mid = future_to_model[future]
+                try:
+                    per_size_stats = future.result()
+                except Exception as exc:
+                    click.echo(
+                        click.style(
+                            f"Unhandled exception for model {mid}: {exc}",
+                            fg="red",
+                            bold=True,
+                        )
+                    )
+                    continue
+
+                all_summaries.append({"model_id": mid, "size_summary": per_size_stats})
+    else:
+        # Sequential execution as before.
+        for curr_model_id in model_ids:
+            per_size_stats = _run_model(curr_model_id)
+            all_summaries.append(
+                {"model_id": curr_model_id, "size_summary": per_size_stats}
+            )
 
     # ------- Cross‑model comparison table (only if >1 model) -------
 
