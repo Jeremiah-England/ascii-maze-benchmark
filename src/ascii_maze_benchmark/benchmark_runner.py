@@ -17,6 +17,9 @@ from ascii_maze_benchmark.generate_maze_script import (
     solution_to_directions,
 )
 
+# Regex to strip ANSI escape sequences for styling
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
 
 class BenchmarkRunner:
     """Class to handle running the ASCII maze benchmark against various models."""
@@ -724,7 +727,7 @@ Here's the maze:
 
 
 @click.command(name="run-benchmark")
-@click.argument("model_id", type=str)
+@click.argument("model_ids", nargs=-1, type=str)
 @click.option(
     "--maze-sizes",
     type=str,
@@ -757,7 +760,7 @@ Here's the maze:
     help="Test model's ability to output directional instructions instead of marking the maze",
 )
 def benchmark_command(
-    model_id: str,
+    model_ids: tuple[str, ...],
     maze_sizes: str,
     mazes_per_size: int,
     seed: int,
@@ -780,6 +783,173 @@ def benchmark_command(
                 bold=True,
             )
         )
+        return
+
+    # Ensure at least one model ID is provided
+    if not model_ids:
+        click.echo(
+            click.style(
+                "Error: At least one model ID must be provided.", fg="red", bold=True
+            )
+        )
+        return
+
+    # Default to the first model for single-model runs
+    model_id = model_ids[0]
+    # Multi-model support: run all provided models and output a comparison table
+    if len(model_ids) > 1:
+        summaries = []
+        sorted_sizes = sorted(sizes)
+        for model_id in model_ids:
+            click.echo(
+                "\n" + click.style(f"Running benchmark on model: {model_id}", bold=True)
+            )
+            click.echo(f"Testing maze sizes: {click.style(maze_sizes, fg='cyan')}")
+            click.echo(f"Mazes per size: {click.style(str(mazes_per_size), fg='cyan')}")
+            click.echo(
+                f"Mode: {click.style('Directional' if directional_mode else 'Maze Marking', fg='magenta' if directional_mode else 'blue', bold=True)}"
+            )
+            if verbose:
+                click.echo(f"Verbose mode: {click.style('ON', fg='green', bold=True)}")
+            try:
+                runner = BenchmarkRunner(model_id, cache_dir, verbose, directional_mode)
+                results = runner.run_benchmark(sizes, mazes_per_size, seed)
+            except Exception as e:
+                click.echo(
+                    click.style(
+                        f"Error running benchmark for model {model_id}: {e}",
+                        fg="red",
+                        bold=True,
+                    )
+                )
+                continue
+            # Compute per-model stats
+            exact_matches = sum(1 for r in results["results"] if r["exact_match"])
+            total = len(results["results"])
+            percentage = exact_matches / total * 100 if total else 0
+            if percentage == 100:
+                overall_color = "green"
+            elif percentage >= 66.6667:
+                overall_color = "yellow"
+            elif percentage >= 33.3333:
+                overall_color = "bright_yellow"
+            else:
+                overall_color = "red"
+            click.echo("\n" + click.style("Benchmark Results Summary:", bold=True))
+            click.echo(f"Model: {click.style(model_id, fg='bright_blue', bold=True)}")
+            if directional_mode:
+                click.echo(
+                    f"Mode: {click.style('Directional Instructions', fg='magenta', bold=True)}"
+                )
+                click.echo(
+                    f"Matching: {click.style('Allowing omission of leading "down" and accepting up to two extra "down" commands at the end', fg='cyan')}"
+                )
+                click.echo(
+                    f"Exact matches: {click.style(f'{exact_matches}/{total} ({percentage:.2f}%)', fg=overall_color, bold=True)}"
+                )
+            else:
+                avg_distance = (
+                    sum(r["levenshtein_distance"] for r in results["results"]) / total
+                    if total
+                    else 0
+                )
+                click.echo(f"Mode: {click.style('Maze Marking', fg='blue', bold=True)}")
+                click.echo(
+                    f"Exact matches: {click.style(f'{exact_matches}/{total} ({percentage:.2f}%)', fg=overall_color, bold=True)} (Avg Levenshtein distance: {click.style(f'{avg_distance:.2f}', fg='cyan', bold=True)})"
+                )
+                thresholds = [
+                    "exact",
+                    "distance_1",
+                    "distance_2",
+                    "distance_5",
+                    "distance_10",
+                    "distance_20",
+                    "percent_95",
+                    "percent_90",
+                    "percent_80",
+                ]
+                for threshold in thresholds:
+                    matches_t = sum(
+                        1 for r in results["results"] if r["levenshteins"][threshold]
+                    )
+                    match_pct = matches_t / total * 100 if total else 0
+                    thresh_color = (
+                        "green"
+                        if match_pct >= 75
+                        else "yellow"
+                        if match_pct >= 50
+                        else "red"
+                    )
+                    disp = (
+                        threshold.replace("_", " ").replace("percent", "within").title()
+                    )
+                    click.echo(
+                        f"{disp}: {click.style(f'{matches_t}/{total} ({match_pct:.2f}%)', fg=thresh_color)}"
+                    )
+            click.echo()
+            click.echo(click.style("Per-Size Summary:", bold=True))
+            size_summary = {}
+            for w, h in sorted_sizes:
+                size_res = [r for r in results["results"] if r["maze_size"] == (w, h)]
+                cnt = len(size_res)
+                mat = sum(r["exact_match"] for r in size_res)
+                pct = mat / cnt * 100 if cnt else 0
+                size_summary[(w, h)] = (mat, cnt)
+                if pct == 100:
+                    col = "green"
+                elif pct >= 66.6667:
+                    col = "yellow"
+                elif pct >= 33.3333:
+                    col = "bright_yellow"
+                else:
+                    col = "red"
+                click.echo(
+                    f"{w}x{h}: {click.style(f'{mat}/{cnt} ({pct:.2f}%)', fg=col)}"
+                )
+            summaries.append({"model_id": model_id, "size_summary": size_summary})
+        # Comparison table
+        if len(summaries) > 1:
+            click.echo("\n" + click.style("Comparison Table:", bold=True))
+            headers = ["Model"] + [f"{w}x{h}" for w, h in sorted_sizes]
+            # Build table rows: header and data rows
+            table_rows = [headers]
+            for summ in summaries:
+                row = [summ["model_id"]]
+                for size in sorted_sizes:
+                    mat, cnt = summ["size_summary"].get(size, (0, 0))
+                    pct = mat / cnt * 100 if cnt else 0
+                    txt = f"{mat}/{cnt} ({pct:.0f}%)"
+                    if pct == 100:
+                        fg = "green"
+                    elif pct >= 66.6667:
+                        fg = "yellow"
+                    elif pct >= 33.3333:
+                        fg = "bright_yellow"
+                    else:
+                        fg = "red"
+                    row.append(click.style(txt, fg=fg))
+                table_rows.append(row)
+
+            # Compute visible column widths by stripping ANSI codes
+            def strip_ansi(s: str) -> str:
+                return ANSI_ESCAPE.sub("", s)
+
+            col_widths = [
+                max(len(strip_ansi(r[i])) for r in table_rows)
+                for i in range(len(headers))
+            ]
+            # Print header row
+            header_cells = [
+                headers[i].ljust(col_widths[i]) for i in range(len(headers))
+            ]
+            click.echo("  ".join(header_cells))
+            # Print data rows
+            for row in table_rows[1:]:
+                cells = []
+                for i, cell in enumerate(row):
+                    vis = strip_ansi(cell)
+                    cells.append(cell + " " * (col_widths[i] - len(vis)))
+                click.echo("  ".join(cells))
         return
 
     click.echo(f"Running benchmark on model: {click.style(model_id, fg='bright_blue')}")
