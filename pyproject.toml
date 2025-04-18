@@ -8,6 +8,8 @@ requires-python = ">=3.13"
 dependencies = [
   "click>=8.1.7",
   "diskcache>=5.6.3",
+  "matplotlib>=3.10.1",
+  "numpy>=2.2.4",
   "python-dotenv>=1.1.0",
   "requests>=2.32.3",
 ]

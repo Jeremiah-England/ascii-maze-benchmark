@@ -764,6 +764,17 @@ Here's the maze:
     is_flag=True,
     help="Run benchmarks for multiple models in parallel (one thread per model)",
 )
+@click.option(
+    "--plot",
+    is_flag=True,
+    help="Display a matplotlib heat‑map of the results after the run (interactive)",
+)
+@click.option(
+    "--plot-save",
+    type=click.Path(dir_okay=False, writable=True),
+    default=None,
+    help="Additionally save the heat‑map to the given file path",
+)
 def benchmark_command(
     model_ids: tuple[str, ...],
     maze_sizes: str,
@@ -773,6 +784,8 @@ def benchmark_command(
     verbose: bool = False,
     directional_mode: bool = False,
     parallel: bool = False,
+    plot: bool = False,
+    plot_save: str | None = None,
 ):
     """Run ASCII maze benchmark on the specified model."""
     # Parse maze sizes from string (format: "3x3,4x4,5x5")
@@ -1038,6 +1051,26 @@ def benchmark_command(
                 for i in range(len(headers))
             ]
             click.echo("  ".join(padded))
+
+    # ------------------------------------------------------------------
+    # Optional: visualisation
+    # ------------------------------------------------------------------
+
+    if plot:
+        try:
+            from ascii_maze_benchmark.visualization import plot_comparison_heatmap
+
+            # Re‑use sizes list and all_summaries structure.
+            plot_comparison_heatmap(
+                all_summaries,
+                sizes,
+                output=plot_save,
+                interactive=True,
+            )
+        except Exception as exc:  # pragma: no cover – plotting is best‑effort
+            click.echo(
+                click.style(f"Could not generate plot: {exc}", fg="red", bold=True)
+            )
 
     return
 
