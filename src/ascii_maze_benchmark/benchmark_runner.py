@@ -73,8 +73,8 @@ class BenchmarkRunner:
         Returns:
             Dictionary containing benchmark results
         """
-        # Set random seed for reproducibility
-        random.seed(seed)
+        # Create a local random number generator for reproducibility and thread safety
+        rng = random.Random(seed)
 
         results = {
             "model_id": self.model_id,
@@ -85,7 +85,7 @@ class BenchmarkRunner:
             "results": [],
         }
 
-        maze_seeds = [random.randint(1, 10000) for _ in range(num_mazes_per_size)]
+        maze_seeds = [rng.randint(1, 10000) for _ in range(num_mazes_per_size)]
 
         total_mazes = len(maze_sizes) * num_mazes_per_size
         current_maze = 0

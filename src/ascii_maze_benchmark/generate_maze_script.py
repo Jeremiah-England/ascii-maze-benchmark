@@ -20,9 +20,8 @@ def generate_maze(width: int, height: int, seed: int | None = None):
         list: A list of strings representing the ASCII maze.
               Returns None if width or height is less than 1.
     """
-    # Set random seed if provided
-    if seed is not None:
-        random.seed(seed)
+    # Create a local random number generator for thread safety
+    rng = random.Random(seed)
     if width < 1 or height < 1:
         raise ValueError("Error: Maze width and height must be at least 1.")
 
@@ -43,8 +42,8 @@ def generate_maze(width: int, height: int, seed: int | None = None):
 
     # 1. Choose a random starting cell (doesn't have to be the entrance)
     start_cell_row, start_cell_col = (
-        random.randint(0, height - 1),
-        random.randint(0, width - 1),
+        rng.randint(0, height - 1),
+        rng.randint(0, width - 1),
     )
     visited[start_cell_row][start_cell_col] = True
     stack.append((start_cell_row, start_cell_col))
@@ -65,7 +64,7 @@ def generate_maze(width: int, height: int, seed: int | None = None):
                     neighbors.append(((next_cell_row, next_cell_col), (dr, dc)))
 
         if neighbors:
-            (next_cell_row, next_cell_col), (dr, dc) = random.choice(neighbors)
+            (next_cell_row, next_cell_col), (dr, dc) = rng.choice(neighbors)
 
             # Remove the wall between cells
             wall_row = 2 * current_cell_row + 1 + dr
