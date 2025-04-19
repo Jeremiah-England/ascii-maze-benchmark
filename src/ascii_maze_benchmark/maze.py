@@ -1,7 +1,6 @@
 import random
 from collections import deque
-from typing import List, Tuple
-
+from typing import List, Tuple, Deque, Set
 
 def generate_maze(width: int, height: int, seed: int | None = None):
     rng = random.Random(seed)
@@ -68,9 +67,8 @@ def solve_maze(maze_list: list[str], return_raw_path: bool = False):
     if start is None or end is None:
         return maze_list if not return_raw_path else (maze_list, None)
 
-    queue = deque([(start, [start])])
-    visited = {start}
-    solution_path = None
+    queue: Deque[tuple[Tuple[int, int], List[Tuple[int, int]]]] = deque([(start, [start])])
+    visited: Set[Tuple[int, int]] = set([start])
 
     while queue:
         (r, c), path = queue.popleft()
@@ -100,7 +98,7 @@ def _is_valid_move(
     height: int,
     width: int,
     maze: List[List[str]],
-    visited: set[Tuple[int, int]],
+    visited: Set[Tuple[int, int]],
 ) -> bool:
     # Helper function to check if a move is valid
     return (
