@@ -28,6 +28,22 @@ def _ensure_sorted_sizes(sizes: Iterable[tuple[int, int]]) -> list[tuple[int, in
     return sorted(set(sizes), key=lambda s: (s[0], s[1]))
 
 
+def _calculate_row(size_summary: Mapping, ordered_sizes: list[tuple[int, int]]) -> tuple[list[float], list[str]]:
+    """Calculate a row of data and labels based on size summaries."""
+    row: list[float] = []
+    lab_row: list[str] = []
+    for size in ordered_sizes:
+        matches, total = size_summary.get(size, (0, 0))
+        if total > 0:
+            pct = (matches / total) * 100.0
+            row.append(pct)
+            lab_row.append(f"{matches}/{total}\n({pct:.0f}%)")
+        else:
+            row.append(np.nan)
+            lab_row.append("N/A")
+    return row, lab_row
+
+
 def plot_comparison_heatmap(
     summaries: Sequence[Mapping[str, Any]],
     sizes: Iterable[tuple[int, int]],
@@ -75,23 +91,9 @@ def plot_comparison_heatmap(
     labels: list[list[str]] = []
 
     for summ in summaries:
-        row: list[float] = []
-        lab_row: list[str] = []
-
-        size_summary = summ.get("size_summary", {})  # type: ignore[arg-type]
-
-        for size in ordered_sizes:
-            matches, total = size_summary.get(size, (0, 0))
-            if total == 0:
-                row.append(np.nan)
-                lab_row.append("N/A")
-            else:
-                pct = matches / total * 100.0
-                row.append(pct)
-                lab_row.append(f"{matches}/{total}\n({pct:.0f}%)")
-
-        data.append(row)
-        labels.append(lab_row)
+        row_data, row_labels = _calculate_row(summ.get("size_summary", {}), ordered_sizes)
+        data.append(row_data)
+        labels.append(row_labels)
 
     data_arr = np.array(data)
 
