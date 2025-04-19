@@ -2,6 +2,7 @@ import random
 from collections import deque
 from typing import List, Tuple, Deque, Set
 
+
 def generate_maze(width: int, height: int, seed: int | None = None):
     rng = random.Random(seed)
     if width < 1 or height < 1:
@@ -67,7 +68,10 @@ def solve_maze(maze_list: list[str], return_raw_path: bool = False):
     if start is None or end is None:
         return maze_list if not return_raw_path else (maze_list, None)
 
-    queue: Deque[tuple[Tuple[int, int], List[Tuple[int, int]]]] = deque([(start, [start])])
+    solution_path = None  # Initialize to handle unbound variable
+    queue: Deque[tuple[Tuple[int, int], List[Tuple[int, int]]]] = deque(
+        [(start, [start])]
+    )
     visited: Set[Tuple[int, int]] = set([start])
 
     while queue:
