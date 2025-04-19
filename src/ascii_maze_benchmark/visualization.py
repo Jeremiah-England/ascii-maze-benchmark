@@ -104,6 +104,7 @@ def plot_comparison_heatmap(
     # Create a lighter version of the RdYlGn colormap for better readability
     cmap_original = plt.cm.RdYlGn
     lighter_cmap = cmap_original(np.linspace(0.2, 0.8, 256))  # Adjusted to include a lighter red at the low end
+    lighter_cmap[0] = np.array([1.0, 0.6, 0.6, 1.0])  # Set the first color to ff9999 (normalized RGBA)
     cmap = ListedColormap(lighter_cmap)
     cmap.set_bad(color="#f0f0f0")
 
