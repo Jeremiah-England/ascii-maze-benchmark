@@ -17,3 +17,12 @@ repos:
     rev: v1.1.399
     hooks:
       - id: pyright
+  - repo: local
+    hooks:
+      - id: pytest-with-uv
+        name: Run pytest with uv
+        entry: uv run pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        description: Runs pytest using uv to ensure tests pass before committing
