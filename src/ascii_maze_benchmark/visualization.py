@@ -28,7 +28,9 @@ def _ensure_sorted_sizes(sizes: Iterable[tuple[int, int]]) -> list[tuple[int, in
     return sorted(set(sizes), key=lambda s: (s[0], s[1]))
 
 
-def _calculate_row(size_summary: Mapping, ordered_sizes: list[tuple[int, int]]) -> tuple[list[float], list[str]]:
+def _calculate_row(
+    size_summary: Mapping, ordered_sizes: list[tuple[int, int]]
+) -> tuple[list[float], list[str]]:
     """Calculate a row of data and labels based on size summaries."""
     row: list[float] = []
     lab_row: list[str] = []
@@ -91,7 +93,9 @@ def plot_comparison_heatmap(
     labels: list[list[str]] = []
 
     for summ in summaries:
-        row_data, row_labels = _calculate_row(summ.get("size_summary", {}), ordered_sizes)
+        row_data, row_labels = _calculate_row(
+            summ.get("size_summary", {}), ordered_sizes
+        )
         data.append(row_data)
         labels.append(row_labels)
 
@@ -105,8 +109,12 @@ def plot_comparison_heatmap(
 
     # Create a lighter version of the RdYlGn colormap for better readability
     cmap_original = plt.cm.RdYlGn
-    lighter_cmap = cmap_original(np.linspace(0.2, 0.8, 256))  # Adjusted to include a lighter red at the low end
-    lighter_cmap[0] = np.array([1.0, 0.6, 0.6, 1.0])  # Set the first color to ff9999 (normalized RGBA)
+    lighter_cmap = cmap_original(
+        np.linspace(0.2, 0.8, 256)
+    )  # Adjusted to include a lighter red at the low end
+    lighter_cmap[0] = np.array(
+        [1.0, 0.6, 0.6, 1.0]
+    )  # Set the first color to ff9999 (normalized RGBA)
     cmap = ListedColormap(lighter_cmap)
     cmap.set_bad(color="#f0f0f0")
 
