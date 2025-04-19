@@ -2,6 +2,7 @@ import random
 from collections import deque
 from typing import List, Tuple
 
+
 def generate_maze(width: int, height: int, seed: int | None = None):
     rng = random.Random(seed)
     if width < 1 or height < 1:
@@ -11,7 +12,10 @@ def generate_maze(width: int, height: int, seed: int | None = None):
     maze = [["#" for _ in range(grid_width)] for _ in range(grid_height)]
     visited = [[False for _ in range(width)] for _ in range(height)]
     stack = []
-    start_cell_row, start_cell_col = rng.randint(0, height - 1), rng.randint(0, width - 1)
+    start_cell_row, start_cell_col = (
+        rng.randint(0, height - 1),
+        rng.randint(0, width - 1),
+    )
     visited[start_cell_row][start_cell_col] = True
     stack.append((start_cell_row, start_cell_col))
     maze[2 * start_cell_row + 1][2 * start_cell_col + 1] = " "
@@ -20,10 +24,16 @@ def generate_maze(width: int, height: int, seed: int | None = None):
         neighbors = []
         for dr, dc in [(-1, 0), (1, 0), (0, 1), (0, -1)]:
             next_cell_row, next_cell_col = current_cell_row + dr, current_cell_col + dc
-            if 0 <= next_cell_row < height and 0 <= next_cell_col < width and not visited[next_cell_row][next_cell_col]:
+            if (
+                0 <= next_cell_row < height
+                and 0 <= next_cell_col < width
+                and not visited[next_cell_row][next_cell_col]
+            ):
                 neighbors.append(((next_cell_row, next_cell_col), (dr, dc)))
         if neighbors:
-            next_cell_row, next_cell_col, dr, dc = rng.choice(neighbors)  # Note: Original code had a small simplification error here; assuming it's as intended
+            next_cell_row, next_cell_col, dr, dc = rng.choice(
+                neighbors
+            )  # Note: Original code had a small simplification error here; assuming it's as intended
             wall_row = 2 * current_cell_row + 1 + dr
             wall_col = 2 * current_cell_col + 1 + dc
             maze[wall_row][wall_col] = " "
@@ -35,6 +45,7 @@ def generate_maze(width: int, height: int, seed: int | None = None):
     maze[0][1] = " "
     maze[grid_height - 1][grid_width - 2] = " "
     return ["".join(row) for row in maze]
+
 
 def solve_maze(maze_list: list[str], return_raw_path: bool = False):
     height = len(maze_list)
@@ -53,14 +64,14 @@ def solve_maze(maze_list: list[str], return_raw_path: bool = False):
             start = (r, 0)
         if maze[r][width - 1] == " " and end is None:
             end = (r, width - 1)
-    
+
     if start is None or end is None:
         return maze_list if not return_raw_path else (maze_list, None)
-    
+
     queue = deque([(start, [start])])
     visited = {start}
     solution_path = None
-    
+
     while queue:
         (r, c), path = queue.popleft()
         if (r, c) == end:
@@ -71,7 +82,7 @@ def solve_maze(maze_list: list[str], return_raw_path: bool = False):
             if _is_valid_move(nr, nc, height, width, maze, visited):
                 visited.add((nr, nc))
                 queue.append(((nr, nc), path + [(nr, nc)]))
-    
+
     if solution_path:
         solved_maze_list = [row[:] for row in maze]
         for r, c in solution_path:
@@ -82,9 +93,23 @@ def solve_maze(maze_list: list[str], return_raw_path: bool = False):
         return ["".join(row) for row in solved_maze_list]
     return maze_list if not return_raw_path else (maze_list, None)
 
-def _is_valid_move(nr: int, nc: int, height: int, width: int, maze: List[List[str]], visited: set[Tuple[int, int]]) -> bool:
+
+def _is_valid_move(
+    nr: int,
+    nc: int,
+    height: int,
+    width: int,
+    maze: List[List[str]],
+    visited: set[Tuple[int, int]],
+) -> bool:
     # Helper function to check if a move is valid
-    return (0 <= nr < height and 0 <= nc < width and maze[nr][nc] != "#" and (nr, nc) not in visited)
+    return (
+        0 <= nr < height
+        and 0 <= nc < width
+        and maze[nr][nc] != "#"
+        and (nr, nc) not in visited
+    )
+
 
 def solution_to_directions(solution_path: List[Tuple[int, int]]) -> List[str]:
     if not solution_path or len(solution_path) < 2:
