@@ -100,7 +100,7 @@ def plot_comparison_heatmap(
 
     fig, ax = plt.subplots(figsize=(1.8 * len(ordered_sizes), 0.8 * len(summaries) + 1))
 
-    cmap = plt.cm.get_cmap("YlGn")
+    cmap = plt.cm.get_cmap("RdYlGn")  # Changed from "YlGn" to "RdYlGn"
     cmap.set_bad(color="#f0f0f0")
 
     im = ax.imshow(data_arr, cmap=cmap, vmin=0, vmax=100)
