@@ -63,6 +63,7 @@ def plot_comparison_heatmap(
         matplotlib.use("Agg")  # Non‑interactive, file‑only
 
     plt = importlib.import_module("matplotlib.pyplot")  # type: ignore
+    from matplotlib.colors import ListedColormap  # Import here for the custom colormap
 
     # ------------------------------------------------------------------
     # Build data matrix
@@ -100,7 +101,10 @@ def plot_comparison_heatmap(
 
     fig, ax = plt.subplots(figsize=(1.8 * len(ordered_sizes), 0.8 * len(summaries) + 1))
 
-    cmap = plt.cm.get_cmap("RdYlGn")  # Changed from "YlGn" to "RdYlGn"
+    # Create a lighter version of the RdYlGn colormap for better readability
+    cmap_original = plt.cm.RdYlGn
+    lighter_cmap = cmap_original(np.linspace(0.4, 0.8, 256))  # Sample from middle range for pastel effect
+    cmap = ListedColormap(lighter_cmap)
     cmap.set_bad(color="#f0f0f0")
 
     im = ax.imshow(data_arr, cmap=cmap, vmin=0, vmax=100)
