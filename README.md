@@ -75,7 +75,7 @@ Options:
 - `--maze-sizes TEXT`: Comma-separated list of maze sizes to test (format: WIDTHxHEIGHT)
 - `--mazes-per-size INTEGER`: Number of different mazes to generate per size
 - `--seed INTEGER`: Random seed for reproducible maze generation
-- `--cache-dir TEXT`: Directory to cache benchmark results
+- `--cache-dir TEXT`: Directory to cache API responses (uses platform-specific directory if not specified)
 
 Example:
 ```
@@ -84,7 +84,10 @@ uv run ascii-maze-benchmark run-benchmark anthropic/claude-3-haiku-20240307 --ma
 
 ## Development Tips
 
-- Benchmark results are cached in the `.cache/benchmark_results` directory by default, so visualization code can be rerun without spending money to rerun the benchmark.
+- API responses are cached in a platform-specific directory:
+  - Linux: `~/.cache/ascii-maze-benchmark/api_responses`
+  - macOS: `~/Library/Caches/ascii-maze-benchmark/api_responses`
+  - Windows: `C:\Users\<username>\AppData\Local\ascii-maze-benchmark\Cache\api_responses`
 - Test the benchmarking code on a cheap model on OpenRouter first, to save costs.
 - Use the `.env` file to manage OpenRouter credentials.
 - Use `uv` for package management and running commands.

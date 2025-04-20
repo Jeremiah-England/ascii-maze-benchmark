@@ -10,6 +10,7 @@ dependencies = [
   "diskcache>=5.6.3",
   "matplotlib>=3.10.1",
   "numpy>=2.2.4",
+  "platformdirs>=4.0.0",
   "python-dotenv>=1.1.0",
   "requests>=2.32.3",
 ]

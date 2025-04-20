@@ -5,7 +5,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from ascii_maze_benchmark.benchmark_runner import benchmark_command
+from ascii_maze_benchmark.benchmark_runner import (
+    benchmark_command,
+    get_default_cache_dir,
+)
 
 
 @click.command(name="run-interactive")
@@ -128,7 +131,7 @@ def run_interactive_command() -> None:  # noqa: D401 – simple docstring ok for
             plot_save = None
 
     # Cache directory – keep the default but allow override
-    cache_dir_default = ".cache/api_responses"
+    cache_dir_default = get_default_cache_dir()
     cache_dir = click.prompt(
         "Cache directory for API responses", default=cache_dir_default, type=str
     )

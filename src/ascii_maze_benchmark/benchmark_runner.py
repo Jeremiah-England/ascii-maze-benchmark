@@ -10,6 +10,7 @@ import click
 import requests
 from dotenv import load_dotenv
 from diskcache import Cache
+from platformdirs import user_cache_dir
 
 from ascii_maze_benchmark.generate_maze_script import (
     generate_maze,
@@ -21,13 +22,28 @@ from ascii_maze_benchmark.generate_maze_script import (
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def get_default_cache_dir(app_name: str = "ascii-maze-benchmark") -> str:
+    """
+    Get the default cache directory for the platform.
+
+    Args:
+        app_name: The application name
+
+    Returns:
+        A path string to the cache directory
+    """
+    # Use platformdirs to get the appropriate cache directory for the OS
+    cache_dir = user_cache_dir(app_name)
+    return str(Path(cache_dir) / "api_responses")
+
+
 class BenchmarkRunner:
     """Class to handle running the ASCII maze benchmark against various models."""
 
     def __init__(
         self,
         model_id: str,
-        cache_dir: str = ".cache/api_responses",
+        cache_dir: str | None = None,
         verbose: bool = False,
         directional_mode: bool = False,
     ):
@@ -36,7 +52,7 @@ class BenchmarkRunner:
 
         Args:
             model_id: The OpenRouter model ID to test
-            cache_dir: Directory to cache API responses
+            cache_dir: Directory to cache API responses (if None, uses platform-specific default)
             verbose: Whether to print detailed information during benchmarking
             directional_mode: If True, tests the model's ability to output directional
                               instructions instead of marking the maze with dots
@@ -54,6 +70,10 @@ class BenchmarkRunner:
             )
 
         self.model_id = model_id
+
+        # Use the provided cache_dir or get the default platform-specific one
+        if cache_dir is None:
+            cache_dir = get_default_cache_dir()
 
         # Create cache directory if it doesn't exist
         cache_dir_path = Path(cache_dir)
@@ -746,8 +766,8 @@ Here's the maze:
 @click.option(
     "--cache-dir",
     type=str,
-    default=".cache/api_responses",
-    help="Directory to cache API responses",
+    default=None,
+    help="Directory to cache API responses (uses platform-specific default if not specified)",
 )
 @click.option(
     "--verbose",
@@ -780,7 +800,7 @@ def benchmark_command(
     maze_sizes: str,
     mazes_per_size: int,
     seed: int,
-    cache_dir: str,
+    cache_dir: str | None,
     verbose: bool = False,
     directional_mode: bool = False,
     parallel: bool = False,

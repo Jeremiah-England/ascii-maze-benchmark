@@ -1,10 +1,18 @@
+import os
+import unittest.mock
 import pytest
+from pathlib import Path
 
 from ascii_maze_benchmark.generate_maze_script import (
     generate_maze,
+    print_maze,
     solve_maze,
     solution_to_directions,
 )
+from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner, get_default_cache_dir
+
+# For tests, create a test-specific cache directory
+test_cache_dir = str(Path(get_default_cache_dir()).parent / "test-cache")
 
 
 @pytest.mark.parametrize(
@@ -245,7 +253,6 @@ def test_smallest_valid_maze():
 
 def test_print_maze(capsys):
     """Test that print_maze displays the maze correctly."""
-    from ascii_maze_benchmark.generate_maze_script import print_maze
 
     maze = ["###", "# #", "###"]
     print_maze(maze)
@@ -317,8 +324,6 @@ def test_print_maze(capsys):
 )
 def test_extract_solution_from_content(content, expected_solution):
     """Test the solution extraction logic with various response formats."""
-    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
-
     solution = BenchmarkRunner.extract_solution_from_content(content)
     assert solution == expected_solution
 
@@ -419,8 +424,6 @@ def test_maze_to_directions():
 )
 def test_extract_directions_from_content(content, expected_directions):
     """Test extracting directional instructions from model responses."""
-    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
-
     directions = BenchmarkRunner.extract_directions_from_content(content)
     assert directions == expected_directions
 
@@ -436,7 +439,7 @@ def test_benchmark_runner_directional_mode():
         # Create a BenchmarkRunner instance in directional mode
         runner = BenchmarkRunner(
             model_id="test_model",
-            cache_dir=".test_cache",
+            cache_dir=test_cache_dir,
             verbose=True,
             directional_mode=True,
         )
@@ -447,7 +450,7 @@ def test_benchmark_runner_directional_mode():
         # Create another runner not in directional mode
         regular_runner = BenchmarkRunner(
             model_id="test_model",
-            cache_dir=".test_cache",
+            cache_dir=test_cache_dir,
             verbose=True,
             directional_mode=False,
         )
@@ -604,16 +607,12 @@ def test_is_exact_match_with_down_omission(
     2. Up to two extra 'down' directions are added at the end
     3. Both of the above occur simultaneously
     """
-    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
-    import os
-    import unittest.mock
-
     # Mock environment variable for the API key
     with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
         # Create a BenchmarkRunner instance with the specified directional mode
         runner = BenchmarkRunner(
             model_id="test_model",
-            cache_dir=".test_cache",
+            cache_dir=test_cache_dir,
             directional_mode=is_directional_mode,
         )
 
@@ -734,15 +733,11 @@ def test_match_description_logic(directions, model_solution, expected_match):
     # This is a direct test of the logic in the verbose output section of the benchmark runner
 
     # First verify that the match is as expected using our runner
-    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
-    import os
-    import unittest.mock
-
     # Mock environment variable for the API key
     with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
         runner = BenchmarkRunner(
             model_id="test_model",
-            cache_dir=".test_cache",
+            cache_dir=test_cache_dir,
             directional_mode=True,  # Always in directional mode for this test
         )
 
@@ -757,10 +752,6 @@ def test_combined_first_down_omitted_and_extra_down():
 
     This test ensures that the _is_exact_match method correctly handles this combined scenario.
     """
-    from ascii_maze_benchmark.benchmark_runner import BenchmarkRunner
-    import os
-    import unittest.mock
-
     # Test data
     correct_solution = ["down", "right", "down", "right"]
     model_solution = ["right", "down", "right", "down", "down"]
@@ -769,7 +760,7 @@ def test_combined_first_down_omitted_and_extra_down():
     with unittest.mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "test_key"}):
         runner = BenchmarkRunner(
             model_id="test_model",
-            cache_dir=".test_cache",
+            cache_dir=test_cache_dir,
             directional_mode=True,
         )
 
